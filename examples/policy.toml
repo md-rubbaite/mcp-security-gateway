@@ -1,0 +1,40 @@
+# mcpguard policy for the demo server. Deny by default: unlisted tools are hidden and cannot be called.
+
+[gateway]
+server_name = "demo"
+default_action = "deny"
+block_unpinned_tools = true        # new or changed tool definitions are hidden until re-pinned
+block_poisoned_tools = true        # tool descriptions with injection text or hidden characters are hidden
+block_secrets_in_args = true       # stop credentials leaving through tool arguments
+redact_secrets_in_results = true
+redact_pii_in_results = true
+block_injection_in_results = false # false: flag and wrap; true: withhold the output entirely
+
+[[tool]]
+name = "read_file"
+rate_per_minute = 60
+max_result_chars = 20000
+[tool.args.path]
+path_prefixes = ["/workspace"]
+max_length = 512
+
+[[tool]]
+name = "fetch_url"
+rate_per_minute = 10
+[tool.args.url]
+url_domains = ["docs.python.org", "learn.microsoft.com", "modelcontextprotocol.io"]
+
+[[tool]]
+name = "send_email"
+requires_approval = true           # a human must approve every call
+rate_per_minute = 5
+[tool.args.to]
+pattern = '[A-Za-z0-9._%+-]+@example\.com'
+[tool.args.subject]
+max_length = 200
+[tool.args.body]
+max_length = 5000
+
+[[tool]]
+name = "add_numbers"
+allow = true                       # allowed by policy, but its poisoned description keeps it hidden

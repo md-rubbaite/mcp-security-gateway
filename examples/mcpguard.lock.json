@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "server": "demo",
+  "tools": {
+    "fetch_url": "sha256:5ebe082c04585cf4b8aad4fe9839a1b16b13dce4be0994cc5aa7f0b94ff998ba",
+    "read_file": "sha256:967ac46220e97c0aae483a7e7f5519a507373dd82b4f44ede6c1f87bb1ca701d",
+    "send_email": "sha256:b69ff1d284f05546ce6c60fa1804f895fe1994d676ecc141d9b501c0962a19ec"
+  }
+}
