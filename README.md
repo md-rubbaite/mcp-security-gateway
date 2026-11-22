@@ -75,6 +75,13 @@ mcpguard verify-audit audit/mcpguard.jsonl
 
 To use it with an MCP host, point the host's server command at `mcpguard proxy … -- <original command>`.
 
+### Use it from your AI agent
+
+A free agent skill on Agensi walks Claude Code, or another agent that supports skills,
+through the whole setup: capture the server's tools, review them, pin the approved ones,
+write a policy and update the host configuration.
+[MCP Security Gateway skill on Agensi →](https://www.agensi.io/skills/mcp-security-gateway-lock-down-any-mcp-server)
+
 ### Example policy
 
 ```toml
