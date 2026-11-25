@@ -15,29 +15,72 @@ jobs:
       matrix:
         python: ["3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python }}
       - run: pip install -e ".[dev]"
       - run: ruff check . && ruff format --check .
       - run: pytest -q
 
-  tool-review:
+  core-only:
+    # The gateway must keep working with zero runtime dependencies (no signing, no telemetry extras).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - run: pip install -e . pytest
+      - run: python -c "import importlib.util as u; assert not u.find_spec('cryptography')"
+      - run: pytest -q
+
+  opa:
+    # Rego unit tests, then the gateway against a real OPA server running the example policy.
     needs: test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v7
+      - uses: open-policy-agent/setup-opa@b2b258e089860efaadaaf71bf6e3aecb4a3eeff1 # v2.4.0
         with:
-          python-version: "3.12"
+          version: 1.22.4
+      - run: opa check --strict policy/
+      - run: opa test -v policy/
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - run: pip install -e ".[dev]"
+      - name: Gateway with a live OPA decision point
+        run: |
+          opa run --server --addr 127.0.0.1:8181 policy/mcpguard.rego > opa.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8181/health && break; sleep 1; done
+          set -o pipefail
+          MCPGUARD_OPA_URL=http://127.0.0.1:8181 pytest -q -rs tests/test_opa_live.py | tee live.txt
+          if grep -q skipped live.txt; then echo "live OPA tests were skipped"; cat opa.log; exit 1; fi
+
+  security-review:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
       - run: pip install .
       - name: Pinned tools must still match the lockfile (the poisoned demo tool is expected to be flagged)
         run: |
           set +e
           mcpguard scan-tools examples/tools.json --lock examples/mcpguard.lock.json | tee scan.txt
           grep -q "add_numbers .*hidden-directive-tag" scan.txt
+      - name: Attack simulation (fails on any regression or new false positive)
+        run: |
+          mcpguard attack-sim --json attack-report.json | tee attack-report.md
+          cat attack-report.md >> "$GITHUB_STEP_SUMMARY"

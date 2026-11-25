@@ -10,6 +10,13 @@ redact_secrets_in_results = true
 redact_pii_in_results = true
 block_injection_in_results = false # false: flag and wrap; true: withhold the output entirely
 
+# Optional (v1.1): ask Open Policy Agent as well, after these local rules allow a call.
+# OPA can only add restrictions; if it is down or slow the call is blocked. See policy/mcpguard.rego.
+# [gateway.opa]
+# url = "http://127.0.0.1:8181"      # local sidecar; use https for anything else
+# decision = "mcpguard/decision"
+# timeout_ms = 500
+
 [[tool]]
 name = "read_file"
 rate_per_minute = 60

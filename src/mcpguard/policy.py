@@ -10,6 +10,8 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import urlparse
 
+from .opa import OpaConfig, validate_config
+
 
 class PolicyError(ValueError):
     pass
@@ -81,6 +83,7 @@ class Policy:
     block_unpinned_tools: bool = True
     block_poisoned_tools: bool = True
     tools: list[ToolPolicy] = field(default_factory=list)
+    opa: OpaConfig | None = None  # optional external decision point (v1.1)
 
     def tool(self, name: str) -> ToolPolicy | None:
         exact = [t for t in self.tools if t.name == name]
@@ -123,6 +126,7 @@ def parse_policy(data: dict[str, Any]) -> Policy:
         block_injection_in_results=g.get("block_injection_in_results", False),
         block_unpinned_tools=g.get("block_unpinned_tools", True),
         block_poisoned_tools=g.get("block_poisoned_tools", True),
+        opa=validate_config(g["opa"]) if "opa" in g else None,
     )
     for raw in data.get("tool", []):
         if "name" not in raw:

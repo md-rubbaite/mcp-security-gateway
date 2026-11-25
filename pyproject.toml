@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcpguard"
-version = "1.0.0"
-description = "Policy-enforcing security gateway for Model Context Protocol (MCP) servers: tool pinning, argument policy, secret/PII filtering, rate limits and a tamper-evident audit log."
+version = "1.1.0"
+description = "Policy-enforcing security gateway for Model Context Protocol (MCP) servers: tool pinning, argument policy, secret/PII filtering, rate limits, signed audit log, optional OPA policies and an attack simulation harness."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -13,7 +13,9 @@ authors = [{ name = "Rubbaite T. Hassain" }]
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=9.2.0", "ruff>=0.17.5"]
+signing = ["cryptography>=46"]
+otel = ["opentelemetry-api>=1.30"]
+dev = ["pytest>=9.2.0", "ruff>=0.17.5", "cryptography>=46", "opentelemetry-sdk>=1.30"]
 
 [project.scripts]
 mcpguard = "mcpguard.cli:main"

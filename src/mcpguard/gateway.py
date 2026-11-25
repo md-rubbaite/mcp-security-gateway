@@ -15,9 +15,11 @@ from typing import Any
 
 from .audit import AuditLog, hash_value
 from .detectors import find_injection, find_secrets, iter_strings, redact
+from .opa import OpaClient
 from .pinning import review_tools
 from .policy import Policy
 from .ratelimit import RateLimiter
+from .telemetry import record_outcome, span
 
 Message = dict[str, Any]
 Approver = Callable[[str, dict[str, Any]], bool]
@@ -49,8 +51,10 @@ class Gateway:
         audit: AuditLog | None = None,
         limiter: RateLimiter | None = None,
         approver: Approver | None = None,
+        opa: OpaClient | None = None,
     ):
         self.policy = policy
+        self.opa = opa if opa is not None else (OpaClient(policy.opa) if policy.opa else None)
         self.lock = lock or {}
         self.audit = audit or AuditLog(None)
         self.limiter = limiter or RateLimiter()
@@ -66,7 +70,18 @@ class Gateway:
         if method == "tools/list" and msg_id is not None:
             self._pending[msg_id] = ("tools/list", None)
         elif method == "tools/call" and msg_id is not None:
-            return self._check_call(msg)
+            name = str((msg.get("params") or {}).get("name", ""))
+            with span(
+                "tools/call",
+                **{
+                    "mcp.method.name": "tools/call",
+                    "gen_ai.tool.name": name,
+                    "mcpguard.server": self.policy.server_name,
+                },
+            ) as s:
+                out = self._check_call(msg)
+                record_outcome(s, out.decision, out.reasons)
+                return out
         return Outcome(forward=msg)
 
     def _allowed_by_policy(self, name: str) -> tuple[bool, str]:
@@ -108,10 +123,27 @@ class Gateway:
             if secret_rules:
                 reasons.append(f"arguments contain credentials ({', '.join(secret_rules)})")
 
+        approved = None
         if not reasons and tp is not None and tp.requires_approval:
             approved = bool(self.approver and self.approver(name, args))
             if not approved:
                 reasons.append(f"tool '{name}' requires human approval, which was not given")
+
+        # External decision point last: it can only add restrictions to a call the local policy allowed.
+        if not reasons and self.opa is not None:
+            decision = self.opa.decide(
+                {
+                    "server": self.policy.server_name,
+                    "tool": name,
+                    "arguments": args,
+                    "requires_approval": bool(tp and tp.requires_approval),
+                    "approved": approved,
+                }
+            )
+            if decision.error:
+                self.audit.write("opa.error", tool=name, id=msg.get("id"), error=decision.error)
+            if not decision.allow:
+                reasons.extend(decision.reasons or ["denied by OPA policy"])
 
         if (
             not reasons
@@ -145,9 +177,15 @@ class Gateway:
         if pending is None or "result" not in msg:
             return Outcome(forward=msg)
         kind, tool = pending
+        attrs = {"mcp.method.name": kind, "mcpguard.server": self.policy.server_name}
         if kind == "tools/list":
-            return self._filter_tool_list(msg)
-        return self._filter_result(msg, tool or "")
+            with span("tools/list result", **attrs) as s:
+                out = self._filter_tool_list(msg)
+        else:
+            with span("tools/call result", **attrs, **{"gen_ai.tool.name": tool or ""}) as s:
+                out = self._filter_result(msg, tool or "")
+        record_outcome(s, out.decision, out.reasons)
+        return out
 
     def _filter_tool_list(self, msg: Message) -> Outcome:
         out = copy.deepcopy(msg)
