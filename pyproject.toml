@@ -15,7 +15,7 @@ dependencies = []
 [project.optional-dependencies]
 signing = ["cryptography>=46"]
 otel = ["opentelemetry-api>=1.30"]
-dev = ["pytest>=9.2.0", "ruff>=0.17.5", "cryptography>=46", "opentelemetry-sdk>=1.30"]
+dev = ["pytest>=9.2.0", "ruff>=0.17.6", "cryptography>=46", "opentelemetry-sdk>=1.30"]
 
 [project.scripts]
 mcpguard = "mcpguard.cli:main"
