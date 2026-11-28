@@ -13,9 +13,9 @@ authors = [{ name = "Rubbaite T. Hassain" }]
 dependencies = []
 
 [project.optional-dependencies]
-signing = ["cryptography>=46"]
+signing = ["cryptography>=50.0.2"]
 otel = ["opentelemetry-api>=1.30"]
-dev = ["pytest>=9.2.0", "ruff>=0.17.5", "cryptography>=46", "opentelemetry-sdk>=1.30"]
+dev = ["pytest>=9.2.0", "ruff>=0.17.5", "cryptography>=50.0.2", "opentelemetry-sdk>=1.30"]
 
 [project.scripts]
 mcpguard = "mcpguard.cli:main"
